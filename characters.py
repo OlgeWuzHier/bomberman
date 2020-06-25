@@ -17,12 +17,17 @@ Y_CHANGE = {
 class Character:
     def __init__(self):
         self.speed = constants.BASE_SPEED
+        self.x = 0
+        self.y = 0
 
     def draw(self):
         raise NotImplemented
 
     def clear(self):
         raise NotImplemented
+
+    def get_tile_position(self):
+        return self.x // constants.SPRITE_SIZE, self.y // constants.SPRITE_SIZE
 
 
 class Enemy(Character):
@@ -42,23 +47,51 @@ class Player(Character):
         image_x, image_y = constants.BOMBERMAN_MOVEMENT_ANIMATION[self.direction][int(self.frame)]
         return assets.Assets.get_image_at(image_x, image_y)
 
-    def move(self):
+    def collision_x(self, blocks, direction):
+        new_x = self.x + direction * self.speed
+        tile_x, tile_y = self.get_tile_position()
+        collision_points = [
+            ((new_x + constants.SPRITE_SIZE / 2) // constants.SPRITE_SIZE, tile_y),
+            ((new_x - constants.SPRITE_SIZE / 2) // constants.SPRITE_SIZE, tile_y),
+        ]
+        for point in collision_points:
+            if point in blocks:
+                return True
+        return False
+
+    def collision_y(self, blocks, direction):
+        tile_x, tile_y = self.get_tile_position()
+        collision_points = [
+            (tile_x, (self.y + direction * self.speed + constants.SPRITE_SIZE / 2) // constants.SPRITE_SIZE),
+            (tile_x, (self.y + direction * self.speed - constants.SPRITE_SIZE / 2) // constants.SPRITE_SIZE),
+        ]
+        for point in collision_points:
+            if point in blocks:
+                return True
+        return False
+
+    def move(self, soft_blocks, hard_blocks):
+        blocks = soft_blocks + hard_blocks
         pressed = pygame.key.get_pressed()
         keys = [pygame.K_LEFT, pygame.K_DOWN, pygame.K_RIGHT, pygame.K_UP]
-
-        for key, direction in X_CHANGE.items():
-            if pressed[key]:
-                self.x += direction * self.speed
-
-        for key, direction in Y_CHANGE.items():
-            if pressed[key]:
-                self.y += direction * self.speed
-
+        print(self.get_tile_position())
         for key in keys:
             if pressed[key]:
                 self.frame = (self.frame + constants.ANIMATION_SPEED) % 4
-                self.direction = keys.index(key)
                 break  # so that animation's speed isn't doubled
+
+        for key, direction in X_CHANGE.items():
+            if pressed[key]:
+                self.direction = keys.index(key)
+                if not self.collision_x(blocks, direction):
+                    self.x += direction * self.speed
+
+        for key, direction in Y_CHANGE.items():
+            if pressed[key]:
+                self.direction = keys.index(key)
+                if not self.collision_y(blocks, direction):
+                    self.y += direction * self.speed
+
 
 
 

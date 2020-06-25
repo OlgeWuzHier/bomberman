@@ -66,7 +66,7 @@ class Game:
         self.screen.blit(self.screen_buffor, (blit_start_x, 2 * constants.SPRITE_SIZE))
 
     def move(self):
-        self.player.move()
+        self.player.move(self.soft_blocks, self.hard_blocks)
 
     def clear(self):
         self.screen.fill(constants.BACKGROUND_COLOR)
@@ -79,7 +79,7 @@ def main():
     # initialization
     pygame.init()
     pygame.display.set_caption("Bomberman")  # set the window title
-    pygame.mouse.set_visible(False)  # hide the mouse
+    #pygame.mouse.set_visible(False)  # hide the mouse
     os.environ['SDL_VIDEO_CENTERED'] = '1'  # center the window
 
     # making necessary objects
