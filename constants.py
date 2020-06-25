@@ -10,8 +10,11 @@ SPRITE_SIZE = 32
 WINDOW_WIDTH, WINDOW_HEIGHT = 16 * SPRITE_SIZE, 15 * SPRITE_SIZE
 FIELD_WIDTH, FIELD_HEIGHT = 31 * SPRITE_SIZE, 13 * SPRITE_SIZE
 
-BASE_SPEED = 4
+BASE_SPEED = 2  # must be a divisor of SPRITE_SIZE (not necessarily integer)
 ANIMATION_SPEED = 0.1
+
+BOMB_TIME = TICK_RATE * 2.5
+BLAST_TIME = TICK_RATE * 0.5
 
 # ANIMATION SPRITE SHEET COORDINATES
 # 1. CHARACTERS
@@ -89,14 +92,14 @@ class Direction(enum.IntEnum):
 
 
 class Bonus(enum.IntEnum):
-    EXTRA_BOMB = 0   # 10 at max
-    FIRE_RANGE = 1   # 5 at max
-    SPEEDUP = 2      # Bomberman's speed is doubled
+    EXTRA_BOMB = 0  # 10 at max
+    FIRE_RANGE = 1  # 5 at max
+    SPEEDUP = 2  # Bomberman's speed is doubled
     WALL_WALKER = 3  # Walk through Soft Blocks, lost after death
-    DETONATOR = 4    # Space to set the bomb(s), Enter to detonate it(/them), lost after death
+    DETONATOR = 4  # Space to set the bomb(s), Enter to detonate it(/them), lost after death
     BOMB_WALKER = 5  # Walk through your bombs, lost after death
     FLAME_PROOF = 6  # Immune to your own bombs, lasts forever, lost after death
-    MYSTERY = 7      # Invisible for bombs and enemies, lasts 35 seconds
+    MYSTERY = 7  # Invisible for bombs and enemies, lasts 35 seconds
 
 
 class Monster(enum.IntEnum):
@@ -165,5 +168,5 @@ LEVEL_LIST_FEATURES = [
     ([0, 0, 0, 0, 2, 2, 6, 0], 5),  # 47
     ([0, 0, 0, 0, 1, 2, 6, 1], 4),  # 48
     ([0, 0, 0, 0, 2, 1, 6, 1], 6),  # 49
-    ([0, 0, 0, 0, 2, 1, 5, 2], 7)   # 50
+    ([0, 0, 0, 0, 2, 1, 5, 2], 7)  # 50
 ]

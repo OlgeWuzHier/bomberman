@@ -3,22 +3,10 @@ import pygame
 import constants
 import assets
 
-X_CHANGE = {
-    pygame.K_LEFT: -1,
-    pygame.K_RIGHT: +1,
-}
-
-Y_CHANGE = {
-    pygame.K_UP: -1,
-    pygame.K_DOWN: +1,
-}
-
 
 class Character:
     def __init__(self):
-        self.speed = constants.BASE_SPEED
-        self.x = 0
-        self.y = 0
+        pass
 
     def draw(self):
         raise NotImplemented
@@ -26,73 +14,136 @@ class Character:
     def clear(self):
         raise NotImplemented
 
-    def get_tile_position(self):
-        return self.x // constants.SPRITE_SIZE, self.y // constants.SPRITE_SIZE
-
 
 class Enemy(Character):
     pass
 
 
-class Player(Character):
+class Blast(pygame.sprite.Sprite):
+    def __init__(self, start_pos, type, rotation):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = assets.Assets.get_image_at(0, 3)
+        self.rect = self.image.get_rect()
+        self.rect.x = start_pos[0] * constants.SPRITE_SIZE
+        self.rect.y = start_pos[1] * constants.SPRITE_SIZE
+        self.frame = 0
+        self.timer = constants.BLAST_TIME
+
+    def kill(self):
+
+        pygame.sprite.Sprite.kill(self)
+
+    def update(self):
+        self.timer -= 1
+        if self.timer == 0:
+            self.kill()
+        # Update image frame
+        self.frame = (self.frame + constants.ANIMATION_SPEED) % 4
+        # Update image according to frame
+        image_x, image_y = constants.BOMB_TICKING_ANIMATION[int(self.frame)]
+        self.image = assets.Assets.get_image_at(image_x, image_y)
+
+
+class Bomb(pygame.sprite.Sprite):
+    def __init__(self, start_pos, range, blasts, hard_blocks, soft_blocks):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = assets.Assets.get_image_at(0, 3)
+        self.rect = self.image.get_rect()
+        self.rect.x = start_pos[0] * constants.SPRITE_SIZE
+        self.rect.y = start_pos[1] * constants.SPRITE_SIZE
+        self.frame = 0
+        self.timer = constants.BOMB_TIME
+        self.blasts = blasts
+        self.range = range
+        self.hard_blocks = hard_blocks
+        self.soft_blocks = soft_blocks
+
+    def kill(self):
+        for direction in constants.Direction:
+            print(direction)
+        pygame.sprite.Sprite.kill(self)
+
+    def update(self):
+        self.timer -= 1
+        if self.timer == 0:
+            self.kill()
+        # Update image frame
+        self.frame = (self.frame + constants.ANIMATION_SPEED) % 4
+        # Update image according to frame
+        image_x, image_y = constants.BOMB_TICKING_ANIMATION[int(self.frame)]
+        self.image = assets.Assets.get_image_at(image_x, image_y)
+
+
+class Block(pygame.sprite.Sprite):
+    def __init__(self, image_pos, start_pos):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = assets.Assets.get_image_at(image_pos[0], image_pos[1])
+        self.rect = self.image.get_rect()
+        self.rect.x = start_pos[0] * constants.SPRITE_SIZE
+        self.rect.y = start_pos[1] * constants.SPRITE_SIZE
+
+
+class HardBlock(Block):
+    def __init__(self, start_x, start_y):
+        super().__init__((3, 3), (start_x, start_y))
+
+
+class SoftBlock(Block):
+    def __init__(self, start_x, start_y):
+        super().__init__((4, 3), (start_x, start_y))
+
+
+class Player(pygame.sprite.Sprite):
     """Class representing the Bomberman himself."""
     def __init__(self, start_x, start_y):
-        super().__init__()
-        self.x = (start_x + 0.5) * constants.SPRITE_SIZE
-        self.y = (start_y + 0.5) * constants.SPRITE_SIZE
+        pygame.sprite.Sprite.__init__(self)
+        self.image = assets.Assets.get_image_at(1, 1)
+        self.rect = self.image.get_rect()
+        self.rect.x = start_x * constants.SPRITE_SIZE
+        self.rect.y = start_y * constants.SPRITE_SIZE
         self.frame = 1
         self.direction = constants.Direction.RIGHT
+        self.speed = constants.BASE_SPEED
+        self.__max_bombs = 1
+        self.__blast_range = 1
 
-    def get_image(self):
-        image_x, image_y = constants.BOMBERMAN_MOVEMENT_ANIMATION[self.direction][int(self.frame)]
-        return assets.Assets.get_image_at(image_x, image_y)
+    @property
+    def blast_range(self):
+        return self.__blast_range
 
-    def collision_x(self, blocks, direction):
-        new_x = self.x + direction * self.speed
-        tile_x, tile_y = self.get_tile_position()
-        collision_points = [
-            ((new_x + constants.SPRITE_SIZE / 2) // constants.SPRITE_SIZE, tile_y),
-            ((new_x - constants.SPRITE_SIZE / 2) // constants.SPRITE_SIZE, tile_y),
-        ]
-        for point in collision_points:
-            if point in blocks:
-                return True
-        return False
+    @blast_range.setter
+    def blast_range(self, blast_range):
+        if blast_range >= 5:
+            self.__blast_range = 5
 
-    def collision_y(self, blocks, direction):
-        tile_x, tile_y = self.get_tile_position()
-        collision_points = [
-            (tile_x, (self.y + direction * self.speed + constants.SPRITE_SIZE / 2) // constants.SPRITE_SIZE),
-            (tile_x, (self.y + direction * self.speed - constants.SPRITE_SIZE / 2) // constants.SPRITE_SIZE),
-        ]
-        for point in collision_points:
-            if point in blocks:
-                return True
-        return False
+    @property
+    def max_bombs(self):
+        return self.__max_bombs
 
-    def move(self, soft_blocks, hard_blocks):
-        blocks = soft_blocks + hard_blocks
+    @max_bombs.setter
+    def max_bombs(self, max_bombs):
+        if max_bombs >= 10:
+            self.__max_bombs = 10
+
+    def update(self):
+        # Update image direction and frame
         pressed = pygame.key.get_pressed()
         keys = [pygame.K_LEFT, pygame.K_DOWN, pygame.K_RIGHT, pygame.K_UP]
-        print(self.get_tile_position())
         for key in keys:
             if pressed[key]:
+                self.direction = keys.index(key)
                 self.frame = (self.frame + constants.ANIMATION_SPEED) % 4
                 break  # so that animation's speed isn't doubled
 
-        for key, direction in X_CHANGE.items():
-            if pressed[key]:
-                self.direction = keys.index(key)
-                if not self.collision_x(blocks, direction):
-                    self.x += direction * self.speed
+        # Update image according to frame and direction
+        image_x, image_y = constants.BOMBERMAN_MOVEMENT_ANIMATION[self.direction][int(self.frame)]
+        self.image = assets.Assets.get_image_at(image_x, image_y)
 
-        for key, direction in Y_CHANGE.items():
-            if pressed[key]:
-                self.direction = keys.index(key)
-                if not self.collision_y(blocks, direction):
-                    self.y += direction * self.speed
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
 
-
+    def get_tile_pos(self):
+        return self.rect.center[0] // constants.SPRITE_SIZE, self.rect.center[1] // constants.SPRITE_SIZE
 
 
 class Ballom(Enemy):

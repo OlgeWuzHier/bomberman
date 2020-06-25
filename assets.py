@@ -1,4 +1,5 @@
-import pygame, constants
+import constants
+import pygame
 
 
 class Assets:
@@ -13,8 +14,8 @@ class Assets:
     def get_image_at(x, y):
         """Returns image found in sprite sheet at given coordinates"""
         rectangle = pygame.Rect((
-            x * (constants.SPRITE_SIZE),
-            y * (constants.SPRITE_SIZE),
+            x * constants.SPRITE_SIZE,
+            y * constants.SPRITE_SIZE,
             constants.SPRITE_SIZE,
             constants.SPRITE_SIZE
         ))
