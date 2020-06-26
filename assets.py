@@ -8,6 +8,7 @@ class Assets:
         Assets.SPRITE_SHEET = pygame.image.load("sprite_sheet.png").convert()
         with open("gamemap.txt") as file:
             Assets.GAMEMAP = [line.rstrip('\n') for line in file]
+        Assets.FONT = pygame.font.Font("PressStart2P-Regular.ttf", 16)
 
     # loading images
     @staticmethod
@@ -29,3 +30,7 @@ class Assets:
         for y, line in enumerate(Assets.GAMEMAP):
             for x, cell in enumerate(line):
                 yield x, y, cell
+
+    @staticmethod
+    def get_font():
+        return Assets.FONT

@@ -36,8 +36,14 @@ class Game:
         self.blasts = pygame.sprite.Group()
         self.monsters = pygame.sprite.Group()
         self.time = 200 * constants.TICK_RATE
+        self.score = 0
 
     def initialize_level(self, level):
+        # Reset game variables
+        self.bombs = pygame.sprite.Group()
+        self.blasts = pygame.sprite.Group()
+        self.monsters = pygame.sprite.Group()
+        self.time = 200 * constants.TICK_RATE
         # Reset player variables
         self.player.sprite.dead = 0
         self.player.sprite.frame = 0
@@ -63,7 +69,6 @@ class Game:
         free_tiles = list(set(free_tiles) - set(soft_block_locations))
         numpy.random.shuffle(free_tiles)
         # Spawn monsters
-        self.monsters = pygame.sprite.Group()
         level_content = constants.LEVEL_CONTENT_LIST[level - 1]
         for monster_name, monster_count in enumerate(level_content[0]):
             for i in range(monster_count):
@@ -95,6 +100,8 @@ class Game:
 
     def move_player(self):
         player = self.player.sprite
+        if player.dead == 1:
+            return
         moved = False
         pressed = pygame.key.get_pressed()
         blocks = pygame.sprite.Group(self.hard_blocks.sprites() + self.soft_blocks.sprites())
@@ -184,7 +191,42 @@ class Game:
                 self.initialize_level(self.level)
 
     def update_scoreboard(self):
+        font = assets.Assets.get_font()
 
+        strings = [
+            f"TIME {self.time // constants.TICK_RATE}",
+            f"{self.score}",
+            f"LIVES {self.player.sprite.lives}",
+        ]
+
+        for position, string in enumerate(strings):
+
+            text = font.render(string, True, constants.WHITE_COLOR, constants.BACKGROUND_COLOR)
+            text.set_colorkey(constants.BACKGROUND_COLOR)
+            text_rect = text.get_rect()
+
+            text_shadow = font.render(string, True, constants.BLACK_COLOR, constants.BACKGROUND_COLOR)
+            text_shadow.set_colorkey(constants.BACKGROUND_COLOR)
+
+            text_shadow_rect = text_shadow.get_rect()
+
+            text_rect.top = constants.SPRITE_SIZE
+            text_shadow_rect.top = constants.SPRITE_SIZE
+            if position == 0:
+                text_rect.x = constants.SPRITE_SIZE / 2
+                text_shadow_rect.x = constants.SPRITE_SIZE / 2
+            elif position == 1:
+                text_rect.center = (constants.WINDOW_WIDTH / 2, text_rect.center[1])
+                text_shadow_rect.center = (constants.WINDOW_WIDTH / 2, text_shadow_rect.center[1])
+            elif position == 2:
+                text_rect.right = constants.WINDOW_WIDTH - constants.SPRITE_SIZE / 2
+                text_shadow_rect.right = constants.WINDOW_WIDTH - constants.SPRITE_SIZE / 2
+
+            text_shadow_rect.x += 3
+            text_shadow_rect.y += 1
+
+            self.screen.blit(text_shadow, text_shadow_rect)
+            self.screen.blit(text, text_rect)
 
 
 def main():
