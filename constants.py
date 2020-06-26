@@ -10,7 +10,7 @@ SPRITE_SIZE = 32
 WINDOW_WIDTH, WINDOW_HEIGHT = 16 * SPRITE_SIZE, 15 * SPRITE_SIZE
 FIELD_WIDTH, FIELD_HEIGHT = 31 * SPRITE_SIZE, 13 * SPRITE_SIZE
 
-BASE_SPEED = 2  # must be a divisor of SPRITE_SIZE (not necessarily integer)
+BASE_SPEED = 2  # must be a divisor of SPRITE_SIZE
 ANIMATION_SPEED = 0.1
 
 BOMB_TIME = TICK_RATE * 2.5
@@ -23,44 +23,44 @@ BLOCK_ANIMATION_SPEED = TICK_RATE / BLAST_TIME / 6
 # 1. CHARACTERS
 # list[0] - going right or up, list[1] - going left or down
 BALLOOM_MOVEMENT_ANIMATION = [
+    [(3, 8), (4, 8), (5, 8), (4, 8)],
     [(0, 8), (1, 8), (2, 8), (1, 8)],
-    [(3, 8), (4, 8), (5, 8), (4, 8)]
 ]
 BALLOOM_DEATH_ANIMATION = [(7, 8), (8, 8), (9, 8), (10, 8), (11, 8)]
 
 ONIL_MOVEMENT_ANIMATION = [
+    [(3, 9), (4, 9), (5, 9), (4, 9)],
     [(0, 9), (1, 9), (2, 9), (1, 9)],
-    [(3, 9), (4, 9), (5, 9), (4, 9)]
 ]
 ONIL_DEATH_ANIMATION = [(7, 9), (8, 9), (9, 9), (10, 9), (11, 9)]
 
 DAHL_MOVEMENT_ANIMATION = [
+    [(3, 10), (4, 10), (5, 10), (4, 10)],
     [(0, 10), (1, 10), (2, 10), (1, 10)],
-    [(3, 10), (4, 10), (5, 10), (4, 10)]
 ]
 DAHL_DEATH_ANIMATION = [(7, 10), (8, 10), (9, 10), (10, 10), (11, 10)]
 
 MINVO_MOVEMENT_ANIMATION = [
+    [(3, 11), (4, 11), (5, 11), (4, 11)],
     [(0, 11), (1, 11), (2, 11), (1, 11)],
-    [(3, 11), (4, 11), (5, 11), (4, 11)]
 ]
 MINVO_DEATH_ANIMATION = [(7, 8), (8, 8), (9, 8), (10, 8), (11, 8)]
 
 DORIA_MOVEMENT_ANIMATION = [
+    [(3, 12), (4, 12), (5, 12), (4, 12)],
     [(0, 12), (1, 12), (2, 12), (1, 12)],
-    [(3, 12), (4, 12), (5, 12), (4, 12)]
 ]
 DORIA_DEATH_ANIMATION = [(7, 9), (8, 9), (9, 9), (10, 9), (11, 9)]
 
 OVAPE_MOVEMENT_ANIMATION = [
+    [(3, 13), (4, 13), (5, 13), (4, 13)],
     [(0, 13), (1, 13), (2, 13), (1, 13)],
-    [(3, 13), (4, 13), (5, 13), (4, 13)]
 ]
 OVAPE_DEATH_ANIMATION = [(7, 10), (8, 10), (9, 10), (10, 10), (11, 10)]
 
 TIGLON_MOVEMENT_ANIMATION = [
+    [(3, 14), (4, 14), (5, 14), (4, 14)],
     [(0, 14), (1, 14), (2, 14), (1, 14)],
-    [(3, 14), (4, 14), (5, 14), (4, 14)]
 ]
 TIGLON_DEATH_ANIMATION = [(7, 8), (8, 8), (9, 8), (10, 8), (11, 8)]
 
@@ -112,10 +112,15 @@ class Monster(enum.IntEnum):
     BALLOM = 0,
     ONIL = 1,
     DAHL = 2,
+    MINVO = 3,
+    DORIA = 4,
+    OVAPE = 5,
+    TIGLON = 6,
+    PONTAN = 7
 
 
 # Ballons, Onils, Dahls, Minvos, Dorias, Ovapes, Tiglons, Pontans, Bonus_number
-LEVEL_LIST_FEATURES = [
+LEVEL_CONTENT_LIST = [
     ([6, 0, 0, 0, 0, 0, 0, 0], 1),  # 1
     ([3, 3, 0, 0, 0, 0, 0, 0], 0),  # 2
     ([2, 2, 2, 0, 0, 0, 0, 0], 4),  # 3

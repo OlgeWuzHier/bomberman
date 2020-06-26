@@ -27,16 +27,25 @@ class Game:
         self.screen = screen
         self.screen_buffor = pygame.Surface((constants.FIELD_WIDTH,
                                              constants.FIELD_HEIGHT)).convert()
-        self.player = player
+        self.player = pygame.sprite.GroupSingle(player)
         self.hard_blocks = pygame.sprite.Group(
                             [characters.HardBlock(x, y) for (x, y, cell)
                              in assets.Assets.get_tiles() if cell == "#"])
         self.soft_blocks = pygame.sprite.Group()
         self.bombs = pygame.sprite.Group()
         self.blasts = pygame.sprite.Group()
+        self.monsters = pygame.sprite.Group()
+        self.time = 200 * constants.TICK_RATE
 
-    def initialize_map(self):
-        soft_block_count = 52 + self.level * 2
+    def initialize_level(self, level):
+        # Reset player variables
+        self.player.sprite.dead = 0
+        self.player.sprite.frame = 0
+        player_tile = next(t for t in assets.Assets.get_tiles() if t[2] == "o")
+        self.player.sprite.rect.x = player_tile[0] * constants.SPRITE_SIZE
+        self.player.sprite.rect.y = player_tile[1] * constants.SPRITE_SIZE
+
+        soft_block_count = 52 + level * 2
         free_tiles = [t for t in assets.Assets.get_tiles() if t[2] == " " or t[2] == "."]
 
         # Randomize places for soft blocks
@@ -45,20 +54,37 @@ class Game:
         numpy.random.shuffle(locations)
 
         # Create list of soft blocks in already randomized positions and add to sprite group
+        soft_block_locations = [(tile[0], tile[1]) for (location, tile)
+                                in zip(locations, free_tiles) if location]
         self.soft_blocks = pygame.sprite.Group(
-                            [characters.SoftBlock(tile[0], tile[1]) for (location, tile)
-                             in zip(locations, free_tiles) if location])
+                            [characters.SoftBlock(tile[0], tile[1]) for tile in soft_block_locations])
+        # Randomize places for monsters
+        free_tiles = [(t[0], t[1]) for t in assets.Assets.get_tiles() if t[2] == " "]
+        free_tiles = list(set(free_tiles) - set(soft_block_locations))
+        numpy.random.shuffle(free_tiles)
+        # Spawn monsters
+        self.monsters = pygame.sprite.Group()
+        level_content = constants.LEVEL_CONTENT_LIST[level - 1]
+        for monster_name, monster_count in enumerate(level_content[0]):
+            for i in range(monster_count):
+                self.monsters.add(characters.get_monster_by_name(monster_name,
+                                                                 free_tiles.pop(),
+                                                                 self.bombs,
+                                                                 self.soft_blocks,
+                                                                 self.hard_blocks))
 
     def draw(self):
         self.soft_blocks.draw(self.screen_buffor)
         self.hard_blocks.draw(self.screen_buffor)
         self.bombs.draw(self.screen_buffor)
         self.blasts.draw(self.screen_buffor)
+        self.monsters.draw(self.screen_buffor)
         self.player.draw(self.screen_buffor)
 
         # Blit buffor to screen
+        player = self.player.sprite
         blit_start_x = 0
-        player_x = self.player.rect.x + constants.SPRITE_SIZE / 2
+        player_x = player.rect.x + constants.SPRITE_SIZE / 2
 
         if player_x > constants.WINDOW_WIDTH / 2:
             blit_start_x = -player_x + constants.WINDOW_WIDTH / 2
@@ -68,53 +94,58 @@ class Game:
         self.screen.blit(self.screen_buffor, (blit_start_x, 2 * constants.SPRITE_SIZE))
 
     def move_player(self):
+        player = self.player.sprite
         moved = False
         pressed = pygame.key.get_pressed()
         blocks = pygame.sprite.Group(self.hard_blocks.sprites() + self.soft_blocks.sprites())
         for key, direction in X_CHANGE.items():
             if pressed[key]:
-                self.player.rect.x += direction * self.player.speed
+                player.rect.x += direction * player.speed
                 moved = True
-                test_rect = pygame.sprite.spritecollide(self.player, blocks, False)
+                test_rect = pygame.sprite.spritecollide(player, blocks, False)
                 if test_rect:
-                    self.player.rect.x -= direction * self.player.speed
+                    player.rect.x -= direction * player.speed
                     moved = False
-                    if len(test_rect) == 1 and self.player.rect.top % constants.SPRITE_SIZE != 0:
-                        top_point    = (self.player.rect.center[0] + direction * constants.SPRITE_SIZE, self.player.rect.top)
-                        bottom_point = (self.player.rect.center[0] + direction * constants.SPRITE_SIZE, self.player.rect.bottom)
+                    if len(test_rect) == 1 and player.rect.top % constants.SPRITE_SIZE != 0:
+                        top_point    = (player.rect.center[0] + direction * constants.SPRITE_SIZE, player.rect.top)
+                        bottom_point = (player.rect.center[0] + direction * constants.SPRITE_SIZE, player.rect.bottom)
                         collision_top    = test_rect[0].rect.collidepoint(top_point)
                         collision_bottom = test_rect[0].rect.collidepoint(bottom_point)
                         if collision_top and not collision_bottom:
                             # TODO: better alignment
-                            self.player.rect.y += self.player.speed
+                            player.rect.y += player.speed
                             moved = True
                         elif not collision_top and collision_bottom:
-                            self.player.rect.y -= self.player.speed
+                            player.rect.y -= player.speed
                             moved = True
 
         if not moved:
             for key, direction in Y_CHANGE.items():
                 if pressed[key]:
-                    self.player.rect.y += direction * self.player.speed
-                    test_rect = pygame.sprite.spritecollide(self.player, blocks, False)
+                    player.rect.y += direction * player.speed
+                    test_rect = pygame.sprite.spritecollide(player, blocks, False)
                     if test_rect:
-                        self.player.rect.y -= direction * self.player.speed
-                        if len(test_rect) == 1 and self.player.rect.left % constants.SPRITE_SIZE != 0:
-                            left_point  = (self.player.rect.left,  self.player.rect.center[1] + direction * constants.SPRITE_SIZE)
-                            right_point = (self.player.rect.right, self.player.rect.center[1] + direction * constants.SPRITE_SIZE)
+                        player.rect.y -= direction * player.speed
+                        if len(test_rect) == 1 and player.rect.left % constants.SPRITE_SIZE != 0:
+                            left_point  = (player.rect.left,  player.rect.center[1] + direction * constants.SPRITE_SIZE)
+                            right_point = (player.rect.right, player.rect.center[1] + direction * constants.SPRITE_SIZE)
                             collision_left  = test_rect[0].rect.collidepoint(left_point)
                             collision_right = test_rect[0].rect.collidepoint(right_point)
                             if collision_left and not collision_right:
-                                self.player.rect.x += self.player.speed
+                                player.rect.x += player.speed
                             elif not collision_left and collision_right:
-                                self.player.rect.x -= self.player.speed
+                                player.rect.x -= player.speed
 
     def update(self):
+        self.time -= 1
+        self.update_scoreboard()
+        self.check_player_death()
         self.move_player()
         self.place_bomb()
-
+        self.check_collisions()
         # Update sprites
         self.player.update()
+        self.monsters.update()
         self.bombs.update()
         self.blasts.update()
         self.soft_blocks.update()
@@ -127,31 +158,50 @@ class Game:
                                                  (constants.FIELD_WIDTH, constants.FIELD_HEIGHT)))
 
     def place_bomb(self):
+        player = self.player.sprite
         pressed = pygame.key.get_pressed()
         if pressed[pygame.K_SPACE]:
-            if self.player.max_bombs > len(self.bombs.sprites()):
-                self.bombs.add(characters.Bomb(self.player.get_tile_pos(),
-                                               self.player.blast_range,
-                                               self.blasts,
-                                               self.hard_blocks,
-                                               self.soft_blocks))
+            if player.max_bombs > len(self.bombs.sprites()):
+                if not pygame.sprite.spritecollide(player, self.bombs, False):
+                    self.bombs.add(characters.Bomb(player.get_tile_pos(),
+                                                   player.blast_range,
+                                                   self.blasts,
+                                                   self.hard_blocks,
+                                                   self.soft_blocks))
+
+    def check_collisions(self):
+        pygame.sprite.groupcollide(self.monsters, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
+        pygame.sprite.groupcollide(self.blasts, self.monsters, False, True, pygame.sprite.collide_rect_ratio(0.7))
+        pygame.sprite.groupcollide(self.blasts, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
+
+    def check_player_death(self):
+        if self.player.sprite.dead == 1 and int(self.player.sprite.frame) == 7:
+            if self.player.sprite.lives == -1:
+                self.player.sprite.lives = 2
+                # TODO: Reset bonuses here
+                self.initialize_level(1)
+            else:
+                self.initialize_level(self.level)
+
+    def update_scoreboard(self):
 
 
 
 def main():
     # initialization
     pygame.init()
+    screen = pygame.display.set_mode((constants.WINDOW_WIDTH, constants.WINDOW_HEIGHT))
+    assets.Assets.load()
     pygame.display.set_caption("Bomberman")  # set the window title
+    pygame.display.set_icon(assets.Assets.get_image_at(0, 3))
     # pygame.mouse.set_visible(False)  # hide the mouse
     os.environ['SDL_VIDEO_CENTERED'] = '1'  # center the window
 
     # making necessary objects
-    screen = pygame.display.set_mode((constants.WINDOW_WIDTH, constants.WINDOW_HEIGHT))
-    assets.Assets.load()
     player_tile = next(t for t in assets.Assets.get_tiles() if t[2] == "o")
     player = characters.Player(player_tile[0], player_tile[1])
     game = Game(screen, player)
-    game.initialize_map()
+    game.initialize_level(1)
 
     # main game loop
     while not game.over:
