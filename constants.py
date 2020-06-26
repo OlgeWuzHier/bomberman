@@ -16,6 +16,9 @@ ANIMATION_SPEED = 0.1
 BOMB_TIME = TICK_RATE * 2.5
 BLAST_TIME = TICK_RATE * 0.5
 
+# 7 frames in blast animation
+BLAST_ANIMATION_SPEED = TICK_RATE / BLAST_TIME / 7
+BLOCK_ANIMATION_SPEED = TICK_RATE / BLAST_TIME / 6
 # ANIMATION SPRITE SHEET COORDINATES
 # 1. CHARACTERS
 # list[0] - going right or up, list[1] - going left or down
@@ -77,11 +80,14 @@ BOMBERMAN_DEATH_ANIMATION = [(0, 2), (1, 2), (2, 2), (3, 2), (4, 2), (5, 2), (6,
 # 2. ITEMS
 BOMB_TICKING_ANIMATION = [(0, 3), (1, 3), (2, 3), (1, 3)]
 
-BLAST_CENTER_ANIMATION = [(0, 6), (1, 6), (2, 6), (3, 6), (2, 6), (1, 6), (0, 6)]
-BLAST_MIDWAY_ANIMATION = [(0, 5), (1, 5), (2, 5), (3, 5), (2, 5), (1, 5), (0, 5)]
-BLAST_ENDING_ANIMATION = [(0, 4), (1, 4), (2, 4), (3, 4), (2, 4), (1, 4), (0, 4)]
+# [0 - ending, 1 - mid, 2 - center]
+BLAST_ANIMATION = [
+    [(0, 4), (1, 4), (2, 4), (3, 4), (2, 4), (1, 4), (0, 4)],
+    [(0, 5), (1, 5), (2, 5), (3, 5), (2, 5), (1, 5), (0, 5)],
+    [(0, 6), (1, 6), (2, 6), (3, 6), (2, 6), (1, 6), (0, 6)],
+]
 
-SOFT_BLOCK_DISAPPEARING_ANIMATION = [(4, 3), (5, 3), (6, 3), (7, 3), (8, 3), (9, 3), (10, 3)]
+SOFT_BLOCK_DISAPPEARING_ANIMATION = [(5, 3), (6, 3), (7, 3), (8, 3), (9, 3), (10, 3)]
 
 
 class Direction(enum.IntEnum):

@@ -53,6 +53,7 @@ class Game:
         self.soft_blocks.draw(self.screen_buffor)
         self.hard_blocks.draw(self.screen_buffor)
         self.bombs.draw(self.screen_buffor)
+        self.blasts.draw(self.screen_buffor)
         self.player.draw(self.screen_buffor)
 
         # Blit buffor to screen
@@ -111,9 +112,11 @@ class Game:
     def update(self):
         self.move_player()
         self.place_bomb()
+
         # Update sprites
         self.player.update()
         self.bombs.update()
+        self.blasts.update()
         self.soft_blocks.update()
         self.hard_blocks.update()
 
@@ -153,6 +156,12 @@ def main():
     # main game loop
     while not game.over:
         start_time = time.time()
+
+        # enabling closing the window by system button
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                game.over = True
+
         game.clear()
         game.update()
         game.draw()
