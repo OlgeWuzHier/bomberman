@@ -3,6 +3,7 @@ import os
 import random
 import sys
 
+import tracemalloc
 import pygame
 import numpy
 import time
@@ -108,7 +109,7 @@ class Game:
         # Blit buffor to screen
         player = self.player.sprite
         blit_start_x = 0
-        player_x = player.rect.x + constants.SPRITE_SIZE / 2
+        player_x = player.rect.x + constants.SPRITE_SIZE // 2
 
         # Handling window scrolling (actually - not scrolling by the edges)
         if player_x > constants.WINDOW_WIDTH / 2:
@@ -119,6 +120,15 @@ class Game:
         self.screen.blit(self.screen_buffor, (blit_start_x, 2 * constants.SPRITE_SIZE))
 
     def move_player(self):
+        def spritegrouplistcollide(sprite, grouplist, dokill):
+            collision_list = []
+            for group in grouplist:
+                collided = pygame.sprite.spritecollide(sprite, group, dokill)
+                for item in collided:
+                    collision_list.append(item)
+            return collision_list
+
+
         player = self.player.sprite
 
         # Disabling moving the dead corpse :)
@@ -128,17 +138,22 @@ class Game:
         moved = False
         pressed = pygame.key.get_pressed()
         # TODO adjusting block group according to wall-walker bonus
-        blocks = pygame.sprite.Group(self.hard_blocks.sprites() + self.soft_blocks.sprites())
-
+        blocks = [self.hard_blocks, self.soft_blocks]
+        obstacles = [self.hard_blocks, self.soft_blocks, self.bombs]
         # Loop on left and right arrows
         for key, direction in X_CHANGE.items():
             if pressed[key]:
+                if pygame.sprite.spritecollide(player, self.bombs, False):
+                    player.rect.x += direction * player.speed
+                    moved = True
+                    if spritegrouplistcollide(player, blocks, False):
+                        player.rect.x -= direction * player.speed
+                        moved = False
                 player.rect.x += direction * player.speed
                 moved = True
-                # Checking collision
-                test_rect = pygame.sprite.spritecollide(player, blocks, False)
                 # Moving the player back if the collision occured
-                if test_rect:
+                if spritegrouplistcollide(player, obstacles, False):
+                    test_rect = spritegrouplistcollide(player, blocks, False)
                     player.rect.x -= direction * player.speed
                     moved = False
                     # Aligning the player on the X axis so that he won't get stuck on crossings so often
@@ -161,9 +176,13 @@ class Game:
         if not moved:
             for key, direction in Y_CHANGE.items():
                 if pressed[key]:
+                    if pygame.sprite.spritecollide(player, self.bombs, False):
+                        player.rect.y += direction * player.speed
+                        if spritegrouplistcollide(player, blocks, False):
+                            player.rect.y -= direction * player.speed
                     player.rect.y += direction * player.speed
-                    test_rect = pygame.sprite.spritecollide(player, blocks, False)
-                    if test_rect:
+                    if spritegrouplistcollide(player, obstacles, False):
+                        test_rect = spritegrouplistcollide(player, blocks, False)
                         player.rect.y -= direction * player.speed
                         if len(test_rect) == 1 and player.rect.left % constants.SPRITE_SIZE != 0:
                             left_point  = (player.rect.left,  player.rect.center[1] + direction * constants.SPRITE_SIZE)
@@ -272,14 +291,14 @@ class Game:
             text_rect.top = constants.SPRITE_SIZE
             text_shadow_rect.top = constants.SPRITE_SIZE
             if position == 0:
-                text_rect.x = constants.SPRITE_SIZE / 2
-                text_shadow_rect.x = constants.SPRITE_SIZE / 2
+                text_rect.x = constants.SPRITE_SIZE // 2
+                text_shadow_rect.x = constants.SPRITE_SIZE // 2
             elif position == 1:
-                text_rect.center = (constants.WINDOW_WIDTH / 2, text_rect.center[1])
-                text_shadow_rect.center = (constants.WINDOW_WIDTH / 2, text_shadow_rect.center[1])
+                text_rect.center = (constants.WINDOW_WIDTH // 2, text_rect.center[1])
+                text_shadow_rect.center = (constants.WINDOW_WIDTH // 2, text_shadow_rect.center[1])
             elif position == 2:
-                text_rect.right = constants.WINDOW_WIDTH - constants.SPRITE_SIZE / 2
-                text_shadow_rect.right = constants.WINDOW_WIDTH - constants.SPRITE_SIZE / 2
+                text_rect.right = constants.WINDOW_WIDTH - constants.SPRITE_SIZE // 2
+                text_shadow_rect.right = constants.WINDOW_WIDTH - constants.SPRITE_SIZE // 2
 
             text_shadow_rect.x += 3
             text_shadow_rect.y += 1
@@ -334,6 +353,7 @@ class Game:
 
 def main():
     # initialization
+    tracemalloc.start(25)
     pygame.init()
     screen = pygame.display.set_mode((constants.WINDOW_WIDTH, constants.WINDOW_HEIGHT))
     assets.Assets.load()
@@ -344,7 +364,7 @@ def main():
 
     # making necessary objects
     game = Game(screen)
-    game.initialize_level(1)
+    game.initialize_level(3)
 
     # main game loop
     while True:
@@ -361,6 +381,16 @@ def main():
         pygame.display.update()
         # wait for duration of tick minus time used to process code above
         pygame.time.wait(int(constants.TICK_TIME_MS - 1000 * (time.time() - start_time)))
+
+    # tracemalloc
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics('traceback')
+
+    # pick the biggest memory block
+    stat = top_stats[0]
+    print("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
+    for line in stat.traceback.format():
+        print(line)
 
     # sweeping
     pygame.display.quit()

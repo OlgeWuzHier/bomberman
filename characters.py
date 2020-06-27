@@ -257,9 +257,14 @@ class Enemy(pygame.sprite.Sprite):
         possible_directions = []
         for direction in constants.Direction:
             self.rect.x, self.rect.y = get_modified_position((self.rect.x, self.rect.y), direction, 1)
-            if not pygame.sprite.spritecollide(self, self.obstacles, False):
-                possible_directions.append(direction)
+            collision = False
+            for obstacle in self.obstacles:
+                if pygame.sprite.spritecollide(self, obstacle, False):
+                    collision = True
             self.rect.x, self.rect.y = get_modified_position((self.rect.x, self.rect.y), direction, -1)
+            if not collision:
+                possible_directions.append(direction)
+
         return possible_directions
 
 
@@ -277,6 +282,7 @@ class SimpleEnemy(Enemy):
         self.turn_time = 0
         self.movement_animation = None
         self.death_animation = None
+        self.obstacles = [self.bombs, self.soft_blocks, self.hard_blocks.sprites()]
 
     def update(self):
         if self.dead:
@@ -293,9 +299,6 @@ class SimpleEnemy(Enemy):
             image_x, image_y = self.movement_animation[self.direction // 2][int(self.frame)]
             self.image = assets.Assets.get_image_at(image_x, image_y)
             # Move
-            self.obstacles = pygame.sprite.Group(self.bombs.sprites() +
-                                                 self.soft_blocks.sprites() +
-                                                 self.hard_blocks.sprites())
             possible_directions = self.get_possible_directions()
             if len(possible_directions) > 0:
                 if self.rect.x % constants.SPRITE_SIZE == 0 and self.rect.y % constants.SPRITE_SIZE == 0:
