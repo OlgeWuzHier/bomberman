@@ -233,7 +233,6 @@ class Player(pygame.sprite.Sprite):
 
     def kill(self):
         if not self.dead:
-            self.detonator_bonus = False
             self.dead = 1
             self.frame = 0
 

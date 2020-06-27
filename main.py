@@ -1,3 +1,4 @@
+import copy
 import os
 import random
 import sys
@@ -27,6 +28,7 @@ class Game:
         self.level = 1
         self.time = 200 * constants.TICK_RATE
         self.score = 0
+        self.level_score = 0
 
         # Canvas-related variables
         self.screen = screen
@@ -35,6 +37,7 @@ class Game:
 
         # In-game objects variables
         self.player = pygame.sprite.GroupSingle(characters.Player(0, 0))
+        self.player_copy = None
         # Hardblocks (every "#" in gamemap), which remain the same through all levels
         self.hard_blocks = pygame.sprite.Group(
                             [characters.HardBlock((x, y)) for (x, y, cell)
@@ -52,14 +55,14 @@ class Game:
         self.bonuses = pygame.sprite.Group()
         self.monsters = pygame.sprite.Group()
         self.time = 200 * constants.TICK_RATE
-
+        self.level_score = 0
         # Reset player variables
         self.player.sprite.dead = 0
         self.player.sprite.frame = 0
         player_tile = next(t for t in assets.Assets.get_tiles() if t[2] == "o")
         self.player.sprite.rect.x = player_tile[0] * constants.SPRITE_SIZE
         self.player.sprite.rect.y = player_tile[1] * constants.SPRITE_SIZE
-
+        self.player_copy = copy.copy(self.player.sprite)
         # How many soft blocks will be on the current level
         soft_block_count = 52 + level * 2
         free_tiles = [t for t in assets.Assets.get_tiles() if t[2] == " " or t[2] == "."]
@@ -207,7 +210,6 @@ class Game:
     def place_bomb(self):
         player = self.player.sprite
         pressed = pygame.key.get_pressed()
-        # TODO remote detonator of the bombs according to bonus status
         if pressed[pygame.K_SPACE]:
             if player.max_bombs > len(self.bombs.sprites()):
                 # Avoiding placing multiple bombs in one place
@@ -223,7 +225,8 @@ class Game:
         pygame.sprite.groupcollide(self.monsters, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
         collected_bonus = pygame.sprite.groupcollide(self.player, self.bonuses, False, False, pygame.sprite.collide_rect_ratio(0.7))
         self.activate_bonus(collected_bonus)
-        pygame.sprite.groupcollide(self.blasts, self.monsters, False, True, pygame.sprite.collide_rect_ratio(0.7))
+        killed_monsters = pygame.sprite.groupcollide(self.blasts, self.monsters, False, False, pygame.sprite.collide_rect_ratio(0.7))
+        self.add_points(killed_monsters)
         # TODO add invulnerability to bombs when having flame-proof or mystery bonus
         pygame.sprite.groupcollide(self.blasts, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
 
@@ -232,13 +235,18 @@ class Game:
             # Game Over, reseting the game
             if self.player.sprite.lives == -1:
                 self.player.sprite.lives = 2
-                # TODO Reset bonuses
-                # TODO Reset score
+                self.player.sprite.max_bombs = 1
+                self.player.sprite.blast_range = 1
+                self.player.sprite.speed_bonus = False
+                self.player.sprite.detonator_bonus = False
+                self.score = 0
                 self.initialize_level(1)
             # Restart the level with one life and bonuses other than bomb count, speed and blast range lost
             else:
-                # TODO Reset bonuses other than bomb count, speed and blast range
-                # TODO Lower the score for the points acquired in level that death occured on
+                # Adding copy of player to GroupSingle - old one is removed
+                self.player.add(self.player_copy)
+                self.player.sprite.detonator_bonus = False
+                self.score -= self.level_score
                 self.initialize_level(self.level)
 
     def update_scoreboard(self):
@@ -314,6 +322,15 @@ class Game:
                         if len(self.bombs.sprites()) > 0:
                             self.bombs.sprites()[0].kill()
 
+    def add_points(self, killed_monsters):
+        if len(killed_monsters) > 0:
+            for monsters in killed_monsters.values():
+                for monster in monsters:
+                    if not monster.dead:
+                        self.score += monster.points
+                        self.level_score += monster.points
+                        monster.kill()
+
 
 def main():
     # initialization
@@ -327,7 +344,7 @@ def main():
 
     # making necessary objects
     game = Game(screen)
-    game.initialize_level(3)
+    game.initialize_level(1)
 
     # main game loop
     while True:
