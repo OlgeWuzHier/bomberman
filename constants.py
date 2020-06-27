@@ -108,6 +108,7 @@ class Bonus(enum.IntEnum):
     BOMB_WALKER = 5  # Walk through your bombs, lost after death
     FLAME_PROOF = 6  # Immune to your own bombs, lasts forever, lost after death
     MYSTERY = 7  # Invisible for bombs and enemies, lasts 35 seconds
+    EXIT = 8  # Entrance to the next level
 
 
 class Monster(enum.IntEnum):
@@ -121,7 +122,7 @@ class Monster(enum.IntEnum):
     PONTAN = 7
 
 
-# Ballons, Onils, Dahls, Minvos, Dorias, Ovapes, Tiglons, Pontans, Bonus_number
+# Ballons, Onils, Dahls, Minvos, Doria, Ovapes, Tiglons, Pontans, Bonus_number
 LEVEL_CONTENT_LIST = [
     ([6, 0, 0, 0, 0, 0, 0, 0], 1),  # 1
     ([3, 3, 0, 0, 0, 0, 0, 0], 0),  # 2
@@ -181,5 +182,5 @@ LEVEL_CONTENT_LIST = [
     ([0, 0, 0, 0, 2, 2, 6, 0], 5),  # 47
     ([0, 0, 0, 0, 1, 2, 6, 1], 4),  # 48
     ([0, 0, 0, 0, 2, 1, 6, 1], 6),  # 49
-    ([0, 0, 0, 0, 2, 1, 5, 2], 7)  # 50
+    ([0, 0, 0, 0, 2, 1, 5, 2], 7),  # 50
 ]

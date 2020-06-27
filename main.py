@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 
 import pygame
@@ -21,29 +22,37 @@ Y_CHANGE = {
 
 
 class Game:
-    def __init__(self, screen, player):
-        self.over = 0
+    def __init__(self, screen):
+        # Game variables
         self.level = 1
+        self.time = 200 * constants.TICK_RATE
+        self.score = 0
+
+        # Canvas-related variables
         self.screen = screen
         self.screen_buffor = pygame.Surface((constants.FIELD_WIDTH,
                                              constants.FIELD_HEIGHT)).convert()
-        self.player = pygame.sprite.GroupSingle(player)
+
+        # In-game objects variables
+        self.player = pygame.sprite.GroupSingle(characters.Player(0, 0))
+        # Hardblocks (every "#" in gamemap), which remain the same through all levels
         self.hard_blocks = pygame.sprite.Group(
-                            [characters.HardBlock(x, y) for (x, y, cell)
+                            [characters.HardBlock((x, y)) for (x, y, cell)
                              in assets.Assets.get_tiles() if cell == "#"])
         self.soft_blocks = pygame.sprite.Group()
         self.bombs = pygame.sprite.Group()
         self.blasts = pygame.sprite.Group()
+        self.bonuses = pygame.sprite.Group()
         self.monsters = pygame.sprite.Group()
-        self.time = 200 * constants.TICK_RATE
-        self.score = 0
 
     def initialize_level(self, level):
-        # Reset game variables
+        # Reset game variables (in case of leftovers from previous level/life)
         self.bombs = pygame.sprite.Group()
         self.blasts = pygame.sprite.Group()
+        self.bonuses = pygame.sprite.Group()
         self.monsters = pygame.sprite.Group()
         self.time = 200 * constants.TICK_RATE
+
         # Reset player variables
         self.player.sprite.dead = 0
         self.player.sprite.frame = 0
@@ -51,24 +60,29 @@ class Game:
         self.player.sprite.rect.x = player_tile[0] * constants.SPRITE_SIZE
         self.player.sprite.rect.y = player_tile[1] * constants.SPRITE_SIZE
 
+        # How many soft blocks will be on the current level
         soft_block_count = 52 + level * 2
         free_tiles = [t for t in assets.Assets.get_tiles() if t[2] == " " or t[2] == "."]
-
         # Randomize places for soft blocks
         locations = numpy.ones(len(free_tiles))
         locations[soft_block_count:] = 0
         numpy.random.shuffle(locations)
-
         # Create list of soft blocks in already randomized positions and add to sprite group
         soft_block_locations = [(tile[0], tile[1]) for (location, tile)
                                 in zip(locations, free_tiles) if location]
-        self.soft_blocks = pygame.sprite.Group(
-                            [characters.SoftBlock(tile[0], tile[1]) for tile in soft_block_locations])
+        numpy.random.shuffle(soft_block_locations)
         # Randomize places for monsters
         free_tiles = [(t[0], t[1]) for t in assets.Assets.get_tiles() if t[2] == " "]
         free_tiles = list(set(free_tiles) - set(soft_block_locations))
         numpy.random.shuffle(free_tiles)
-        # Spawn monsters
+        # Spawn soft_blocks with bonuses
+        bonus_block = soft_block_locations.pop()
+        exit_block = soft_block_locations.pop()
+        self.soft_blocks = pygame.sprite.Group(
+                            [characters.SoftBlock((tile[0], tile[1])) for tile in soft_block_locations])
+        self.soft_blocks.add(characters.SoftBlock(bonus_block, bonus_type=constants.LEVEL_CONTENT_LIST[level - 1][1], bonuses=self.bonuses))
+        self.soft_blocks.add(characters.SoftBlock(exit_block, bonus_type=constants.Bonus.EXIT, bonuses=self.bonuses))
+        # Spawn monsters basing on the list from contants
         level_content = constants.LEVEL_CONTENT_LIST[level - 1]
         for monster_name, monster_count in enumerate(level_content[0]):
             for i in range(monster_count):
@@ -79,10 +93,12 @@ class Game:
                                                                  self.hard_blocks))
 
     def draw(self):
+        # Draw new frame on the buffor
         self.soft_blocks.draw(self.screen_buffor)
         self.hard_blocks.draw(self.screen_buffor)
         self.bombs.draw(self.screen_buffor)
         self.blasts.draw(self.screen_buffor)
+        self.bonuses.draw(self.screen_buffor)
         self.monsters.draw(self.screen_buffor)
         self.player.draw(self.screen_buffor)
 
@@ -91,6 +107,7 @@ class Game:
         blit_start_x = 0
         player_x = player.rect.x + constants.SPRITE_SIZE / 2
 
+        # Handling window scrolling (actually - not scrolling by the edges)
         if player_x > constants.WINDOW_WIDTH / 2:
             blit_start_x = -player_x + constants.WINDOW_WIDTH / 2
         if player_x > constants.FIELD_WIDTH - constants.WINDOW_WIDTH / 2:
@@ -100,24 +117,35 @@ class Game:
 
     def move_player(self):
         player = self.player.sprite
+
+        # Disabling moving the dead corpse :)
         if player.dead == 1:
             return
+
         moved = False
         pressed = pygame.key.get_pressed()
+        # TODO adjusting block group according to wall-walker bonus
         blocks = pygame.sprite.Group(self.hard_blocks.sprites() + self.soft_blocks.sprites())
+
+        # Loop on left and right arrows
         for key, direction in X_CHANGE.items():
             if pressed[key]:
                 player.rect.x += direction * player.speed
                 moved = True
+                # Checking collision
                 test_rect = pygame.sprite.spritecollide(player, blocks, False)
+                # Moving the player back if the collision occured
                 if test_rect:
                     player.rect.x -= direction * player.speed
                     moved = False
+                    # Aligning the player on the X axis so that he won't get stuck on crossings so often
                     if len(test_rect) == 1 and player.rect.top % constants.SPRITE_SIZE != 0:
-                        top_point    = (player.rect.center[0] + direction * constants.SPRITE_SIZE, player.rect.top)
+                        # Two points - upper- and bottom-right/left (according to the direction) are checked for collision
+                        top_point = (player.rect.center[0] + direction * constants.SPRITE_SIZE, player.rect.top)
                         bottom_point = (player.rect.center[0] + direction * constants.SPRITE_SIZE, player.rect.bottom)
-                        collision_top    = test_rect[0].rect.collidepoint(top_point)
+                        collision_top = test_rect[0].rect.collidepoint(top_point)
                         collision_bottom = test_rect[0].rect.collidepoint(bottom_point)
+                        # If the collision was only on one of the points - the player is aligned
                         if collision_top and not collision_bottom:
                             # TODO: better alignment
                             player.rect.y += player.speed
@@ -126,6 +154,7 @@ class Game:
                             player.rect.y -= player.speed
                             moved = True
 
+        # X-axis moving is favoured to avoid some bugs
         if not moved:
             for key, direction in Y_CHANGE.items():
                 if pressed[key]:
@@ -143,18 +172,29 @@ class Game:
                             elif not collision_left and collision_right:
                                 player.rect.x -= player.speed
 
+        # Align player to grid so that he can change directions
+        dx = player.rect.x % constants.SPRITE_SIZE
+        dy = player.rect.y % constants.SPRITE_SIZE
+        if ((dx <= player.speed / 2 or dx >= constants.SPRITE_SIZE - player.speed / 2) and
+            (dy <= player.speed / 2 or dy >= constants.SPRITE_SIZE - player.speed / 2)):
+            player.rect.x = player.get_tile_pos()[0] * constants.SPRITE_SIZE
+            player.rect.y = player.get_tile_pos()[1] * constants.SPRITE_SIZE
+
     def update(self):
         self.time -= 1
         self.update_scoreboard()
         self.check_player_death()
         self.move_player()
         self.place_bomb()
+        self.detonate_remotely()
         self.check_collisions()
+
         # Update sprites
         self.player.update()
         self.monsters.update()
         self.bombs.update()
         self.blasts.update()
+        self.bonuses.update()
         self.soft_blocks.update()
         self.hard_blocks.update()
 
@@ -167,27 +207,38 @@ class Game:
     def place_bomb(self):
         player = self.player.sprite
         pressed = pygame.key.get_pressed()
+        # TODO remote detonator of the bombs according to bonus status
         if pressed[pygame.K_SPACE]:
             if player.max_bombs > len(self.bombs.sprites()):
-                if not pygame.sprite.spritecollide(player, self.bombs, False):
+                # Avoiding placing multiple bombs in one place
+                if not pygame.sprite.spritecollide(player, self.bombs, False, pygame.sprite.collide_rect_ratio(0.8)):
                     self.bombs.add(characters.Bomb(player.get_tile_pos(),
                                                    player.blast_range,
                                                    self.blasts,
                                                    self.hard_blocks,
-                                                   self.soft_blocks))
+                                                   self.soft_blocks,
+                                                   remote=player.detonator_bonus))
 
     def check_collisions(self):
         pygame.sprite.groupcollide(self.monsters, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
+        collected_bonus = pygame.sprite.groupcollide(self.player, self.bonuses, False, False, pygame.sprite.collide_rect_ratio(0.7))
+        self.activate_bonus(collected_bonus)
         pygame.sprite.groupcollide(self.blasts, self.monsters, False, True, pygame.sprite.collide_rect_ratio(0.7))
+        # TODO add invulnerability to bombs when having flame-proof or mystery bonus
         pygame.sprite.groupcollide(self.blasts, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
 
     def check_player_death(self):
         if self.player.sprite.dead == 1 and int(self.player.sprite.frame) == 7:
+            # Game Over, reseting the game
             if self.player.sprite.lives == -1:
                 self.player.sprite.lives = 2
-                # TODO: Reset bonuses here
+                # TODO Reset bonuses
+                # TODO Reset score
                 self.initialize_level(1)
+            # Restart the level with one life and bonuses other than bomb count, speed and blast range lost
             else:
+                # TODO Reset bonuses other than bomb count, speed and blast range
+                # TODO Lower the score for the points acquired in level that death occured on
                 self.initialize_level(self.level)
 
     def update_scoreboard(self):
@@ -228,6 +279,41 @@ class Game:
             self.screen.blit(text_shadow, text_shadow_rect)
             self.screen.blit(text, text_rect)
 
+    def activate_bonus(self, collected_bonus):
+        if len(collected_bonus) > 0:
+            for bonuses in collected_bonus.values():
+                for bonus in bonuses:
+                    if bonus.bonus_type == constants.Bonus.EXTRA_BOMB:
+                        self.player.sprite.max_bombs += 1
+                    elif bonus.bonus_type == constants.Bonus.FIRE_RANGE:
+                        self.player.sprite.blast_range += 1
+                    elif bonus.bonus_type == constants.Bonus.SPEEDUP:
+                        self.player.sprite.speed_bonus = True
+                    elif bonus.bonus_type == constants.Bonus.WALL_WALKER:
+                        pass
+                    elif bonus.bonus_type == constants.Bonus.DETONATOR:
+                        self.player.sprite.detonator_bonus = True
+                    elif bonus.bonus_type == constants.Bonus.BOMB_WALKER:
+                        pass
+                    elif bonus.bonus_type == constants.Bonus.FLAME_PROOF:
+                        pass
+                    elif bonus.bonus_type == constants.Bonus.MYSTERY:
+                        pass
+                    elif bonus.bonus_type == constants.Bonus.EXIT:
+                        if len(self.monsters.sprites()) == 0:
+                            self.level += 1
+                            self.initialize_level(self.level)
+                    if bonus.bonus_type != constants.Bonus.EXIT:
+                        bonus.kill()
+
+    def detonate_remotely(self):
+        if self.player.sprite.detonator_bonus:
+            for event in pygame.event.get(pygame.KEYDOWN):
+                if event.type == pygame.KEYDOWN:
+                    if event.key in [pygame.K_LCTRL, pygame.K_RCTRL]:
+                        if len(self.bombs.sprites()) > 0:
+                            self.bombs.sprites()[0].kill()
+
 
 def main():
     # initialization
@@ -235,24 +321,21 @@ def main():
     screen = pygame.display.set_mode((constants.WINDOW_WIDTH, constants.WINDOW_HEIGHT))
     assets.Assets.load()
     pygame.display.set_caption("Bomberman")  # set the window title
-    pygame.display.set_icon(assets.Assets.get_image_at(0, 3))
+    pygame.display.set_icon(assets.Assets.get_image_at(0, 3)) # set the window icon
     # pygame.mouse.set_visible(False)  # hide the mouse
     os.environ['SDL_VIDEO_CENTERED'] = '1'  # center the window
 
     # making necessary objects
-    player_tile = next(t for t in assets.Assets.get_tiles() if t[2] == "o")
-    player = characters.Player(player_tile[0], player_tile[1])
-    game = Game(screen, player)
-    game.initialize_level(1)
+    game = Game(screen)
+    game.initialize_level(3)
 
     # main game loop
-    while not game.over:
+    while True:
         start_time = time.time()
 
         # enabling closing the window by system button
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                game.over = True
+        if pygame.QUIT in [event.type for event in pygame.event.get(pygame.QUIT)]:
+            break
 
         game.clear()
         game.update()
@@ -262,7 +345,7 @@ def main():
         # wait for duration of tick minus time used to process code above
         pygame.time.wait(int(constants.TICK_TIME_MS - 1000 * (time.time() - start_time)))
 
-    # collecting the garbage
+    # sweeping
     pygame.display.quit()
     pygame.quit()
     sys.exit()
@@ -270,6 +353,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-

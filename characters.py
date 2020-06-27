@@ -21,8 +21,10 @@ def get_monster_by_name(name, start_pos, bombs, soft_blocks, hard_blocks):
     monster = None
     if name == constants.Monster.BALLOM:
         monster = Ballom(start_pos, bombs, soft_blocks, hard_blocks)
-    # elif name == constants.Monster.ONIL:
-    # elif name == constants.Monster.DAHL:
+    elif name == constants.Monster.ONIL:
+        monster = Onil(start_pos, bombs, soft_blocks, hard_blocks)
+    elif name == constants.Monster.DAHL:
+        monster = Dahl(start_pos, bombs, soft_blocks, hard_blocks)
     # elif name == constants.Monster.MINVO:
     # elif name == constants.Monster.DORIA:
     # elif name == constants.Monster.OVAPE:
@@ -59,21 +61,23 @@ class Blast(pygame.sprite.Sprite):
 
 
 class Bomb(pygame.sprite.Sprite):
-    def __init__(self, start_pos, blast_range, blasts, hard_blocks, soft_blocks):
+    def __init__(self, start_pos, blast_range, blasts, hard_blocks, soft_blocks, remote=False):
         pygame.sprite.Sprite.__init__(self)
         self.image = assets.Assets.get_image_at(0, 3)
         self.rect = self.image.get_rect()
         self.rect.x = start_pos[0] * constants.SPRITE_SIZE
         self.rect.y = start_pos[1] * constants.SPRITE_SIZE
         self.frame = 0
-        self.timer = constants.BOMB_TIME
+        self.timer = -1 if remote else constants.BOMB_TIME
         self.blasts = blasts
         self.blast_range = blast_range
         self.hard_blocks = hard_blocks
         self.soft_blocks = soft_blocks
+        self.remote = remote
+
 
     def kill(self):
-        if self.timer > 5:
+        if self.timer > 5 or self.timer < 0:
             self.timer = 5
         if self.timer == 0:
             self.blasts.add(Blast(self.get_tile_pos(), 2, 0))
@@ -88,8 +92,7 @@ class Bomb(pygame.sprite.Sprite):
                     if pygame.sprite.spritecollide(new_blast, self.soft_blocks, True):
                         break
                     bombs = self.groups()[0]
-                    if pygame.sprite.spritecollide(new_blast, bombs, True):
-                        break
+                    pygame.sprite.spritecollide(new_blast, bombs, True)
                     self.blasts.add(new_blast)
                 else:
                     x, y = get_modified_position(self.get_tile_pos(), direction, self.blast_range)
@@ -99,10 +102,7 @@ class Bomb(pygame.sprite.Sprite):
                     if pygame.sprite.spritecollide(new_blast, self.soft_blocks, True):
                         continue
                     bombs = self.groups()[0]
-                    if pygame.sprite.spritecollide(new_blast, bombs, True):
-                        break
-                    if pygame.sprite.spritecollide(new_blast, bombs, True):
-                        break
+                    pygame.sprite.spritecollide(new_blast, bombs, True)
                     self.blasts.add(new_blast)
 
             pygame.sprite.Sprite.kill(self)
@@ -131,20 +131,27 @@ class Block(pygame.sprite.Sprite):
 
 
 class HardBlock(Block):
-    def __init__(self, start_x, start_y):
-        super().__init__((3, 3), (start_x, start_y))
+    def __init__(self, start_pos):
+        super().__init__((3, 3), start_pos)
 
 
 class SoftBlock(Block):
-    def __init__(self, start_x, start_y):
-        super().__init__((4, 3), (start_x, start_y))
+    def __init__(self, start_pos, bonus_type=-1, bonuses=None):
+        super().__init__((4, 3), start_pos)
         self.frame = 0
         self.dead = 0
+        self.bonus_type = bonus_type
+        self.bonuses = bonuses
 
     def update(self):
+        # TODO: DELETE 2 LINES BELOW
+        if self.bonus_type != -1:
+            self.image = assets.Assets.get_image_at(self.bonus_type, 7)
         if self.dead:
             self.frame += constants.BLOCK_ANIMATION_SPEED
             if int(self.frame) == 6:
+                if self.bonus_type != -1:
+                    self.bonuses.add(Bonus((self.rect.x, self.rect.y), self.bonus_type))
                 pygame.sprite.Sprite.kill(self)
                 return
             image_x, image_y = constants.SOFT_BLOCK_DISAPPEARING_ANIMATION[int(self.frame)]
@@ -152,6 +159,16 @@ class SoftBlock(Block):
 
     def kill(self):
         self.dead = 1
+
+
+class Bonus(pygame.sprite.Sprite):
+    def __init__(self, start_pos, bonus_type):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = assets.Assets.get_image_at(bonus_type, 7)
+        self.rect = self.image.get_rect()
+        self.rect.x = start_pos[0]
+        self.rect.y = start_pos[1]
+        self.bonus_type = bonus_type
 
 
 class Player(pygame.sprite.Sprite):
@@ -165,15 +182,16 @@ class Player(pygame.sprite.Sprite):
         self.frame = 1
         self.direction = constants.Direction.RIGHT
         self.__speed = constants.BASE_SPEED
-        self.__max_bombs = 3
-        self.__blast_range = 3
+        self.__max_bombs = 1
+        self.__blast_range = 1
         self.speed_bonus = False
+        self.detonator_bonus = False
         self.lives = 2
         self.dead = 0
 
     @property
     def speed(self):
-        return self.__speed * 2 if self.speed_bonus else self.__speed
+        return self.__speed * 1.5 if self.speed_bonus else self.__speed
 
     @property
     def blast_range(self):
@@ -181,8 +199,7 @@ class Player(pygame.sprite.Sprite):
 
     @blast_range.setter
     def blast_range(self, blast_range):
-        if blast_range >= 5:
-            self.__blast_range = 5
+        self.__blast_range = 5 if blast_range >= 5 else blast_range
 
     @property
     def max_bombs(self):
@@ -190,8 +207,7 @@ class Player(pygame.sprite.Sprite):
 
     @max_bombs.setter
     def max_bombs(self, max_bombs):
-        if max_bombs >= 10:
-            self.__max_bombs = 10
+        self.__max_bombs = 10 if max_bombs >= 10 else max_bombs
 
     def update(self):
         if self.dead:
@@ -217,6 +233,7 @@ class Player(pygame.sprite.Sprite):
 
     def kill(self):
         if not self.dead:
+            self.detonator_bonus = False
             self.dead = 1
             self.frame = 0
 
@@ -247,20 +264,20 @@ class Enemy(pygame.sprite.Sprite):
         return possible_directions
 
 
-class Ballom(Enemy):
-    """The easiest enemy of them all. Slow and passive.
-
-    Ballom has a very unpredictable movement pattern. They are slow and won't chase after
-    Bomberman, but they turn or reverse direction upon colliding with a wall or bomb."""
+class SimpleEnemy(Enemy):
     def __init__(self, start_pos, bombs, soft_blocks, hard_blocks):
         super().__init__((0, 8), start_pos)
         self.frame = 0
         self.dead = 0
-        self.speed = constants.BASE_SPEED * 0.5
-        self.turn_ratio = 0.03
+        self.freeze = 0
         self.hard_blocks = hard_blocks
         self.soft_blocks = soft_blocks
         self.bombs = bombs
+        self.speed = 0
+        self.turn_ratio = 0
+        self.turn_time = 0
+        self.movement_animation = None
+        self.death_animation = None
 
     def update(self):
         if self.dead:
@@ -269,12 +286,12 @@ class Ballom(Enemy):
             if int(self.frame) == 4:
                 pygame.sprite.Sprite.kill(self)
                 return
-            image_x, image_y = constants.BALLOOM_DEATH_ANIMATION[int(self.frame)]
+            image_x, image_y = self.death_animation[int(self.frame)]
             self.image = assets.Assets.get_image_at(image_x, image_y)
         else:
             # Animate
             self.frame = (self.frame + constants.ANIMATION_SPEED) % 4
-            image_x, image_y = constants.BALLOOM_MOVEMENT_ANIMATION[self.direction // 2][int(self.frame)]
+            image_x, image_y = self.movement_animation[self.direction // 2][int(self.frame)]
             self.image = assets.Assets.get_image_at(image_x, image_y)
             # Move
             self.obstacles = pygame.sprite.Group(self.bombs.sprites() +
@@ -283,33 +300,68 @@ class Ballom(Enemy):
             possible_directions = self.get_possible_directions()
             if len(possible_directions) > 0:
                 if self.rect.x % constants.SPRITE_SIZE == 0 and self.rect.y % constants.SPRITE_SIZE == 0:
-                    if self.direction not in possible_directions or random.random() < self.turn_ratio:
+                    if self.direction not in possible_directions:
                         self.direction = sorted(possible_directions, key=lambda x: random.random())[0]
-                self.rect.x, self.rect.y = get_modified_position((self.rect.x, self.rect.y),
-                                                                 self.direction,
-                                                                 self.speed)
+                        self.freeze = self.turn_time
+                    elif random.random() < self.turn_ratio:
+                        self.direction = sorted(possible_directions, key=lambda x: random.random())[0]
+                if not self.freeze:
+                    self.rect.x, self.rect.y = get_modified_position((self.rect.x, self.rect.y),
+                                                                     self.direction,
+                                                                     self.speed)
+                else:
+                    self.freeze -= 1
 
     def kill(self):
         self.frame = 0
         self.dead = 1
 
 
-class Onil(Enemy):
+class Ballom(SimpleEnemy):
+    """The easiest enemy of them all. Slow and passive.
+
+    Ballom has a very unpredictable movement pattern. They are slow and won't chase after
+    Bomberman, but they turn or reverse direction upon colliding with a wall or bomb."""
+    def __init__(self, start_pos, bombs, soft_blocks, hard_blocks):
+        super().__init__(start_pos, bombs, soft_blocks, hard_blocks)
+        self.speed = constants.BASE_SPEED * 0.5
+        self.turn_ratio = 0.05
+        self.turn_time = 15
+        self.movement_animation = constants.BALLOOM_MOVEMENT_ANIMATION
+        self.death_animation = constants.BALLOOM_DEATH_ANIMATION
+        self.points = 100
+
+
+class Onil(SimpleEnemy):
     """Medium-difficulty enemy. Quite quick, might chase after player.
 
     Onil moves quickly and randomly. They will move towards Bomberman when he is nearby. They
     are not likely to get stuck on walls and can be incredibly troublesome."""
-    pass
+    def __init__(self, start_pos, bombs, soft_blocks, hard_blocks):
+        super().__init__(start_pos, bombs, soft_blocks, hard_blocks)
+        self.speed = constants.BASE_SPEED
+        self.turn_ratio = 0.15
+        self.turn_time = 10
+        self.movement_animation = constants.ONIL_MOVEMENT_ANIMATION
+        self.death_animation = constants.ONIL_DEATH_ANIMATION
+        self.points = 200
 
 
-class Dahl(Enemy):
+class Dahl(SimpleEnemy):
     """Very easy opponent. Slow and passive, prone to stucking into walls.
 
     It moves at slightly fast speed, doing some bouncy moves (it doesn't jump however). It is
     not hard to kill since they are not smart, even less intelligent than Balloms and won't
     try to chase Bomberman. They prefer to move from left to right, sometimes switching to up
     and down. Commonly get stuck in walls."""
-    pass
+    def __init__(self, start_pos, bombs, soft_blocks, hard_blocks):
+        super().__init__(start_pos, bombs, soft_blocks, hard_blocks)
+        self.speed = constants.BASE_SPEED
+        self.turn_ratio = 0.10
+        self.turn_time = 0
+        self.movement_animation = constants.DAHL_MOVEMENT_ANIMATION
+        self.death_animation = constants.DAHL_DEATH_ANIMATION
+        self.points = 400
 
 
 class Minvo(Enemy):
