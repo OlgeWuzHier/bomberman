@@ -48,6 +48,7 @@ class Game:
         self.blasts = pygame.sprite.Group()
         self.bonuses = pygame.sprite.Group()
         self.monsters = pygame.sprite.Group()
+        self.events = pygame.event.get()
 
     def initialize_level(self, level):
         # Reset game variables (in case of leftovers from previous level/life)
@@ -92,6 +93,7 @@ class Game:
             for i in range(monster_count):
                 self.monsters.add(characters.get_monster_by_name(monster_name,
                                                                  free_tiles.pop(),
+                                                                 self.player.sprite,
                                                                  self.bombs,
                                                                  self.soft_blocks,
                                                                  self.hard_blocks))
@@ -120,15 +122,6 @@ class Game:
         self.screen.blit(self.screen_buffor, (blit_start_x, 2 * constants.SPRITE_SIZE))
 
     def move_player(self):
-        def spritegrouplistcollide(sprite, grouplist, dokill):
-            collision_list = []
-            for group in grouplist:
-                collided = pygame.sprite.spritecollide(sprite, group, dokill)
-                for item in collided:
-                    collision_list.append(item)
-            return collision_list
-
-
         player = self.player.sprite
 
         # Disabling moving the dead corpse :)
@@ -145,15 +138,13 @@ class Game:
             if pressed[key]:
                 if pygame.sprite.spritecollide(player, self.bombs, False):
                     player.rect.x += direction * player.speed
-                    moved = True
-                    if spritegrouplistcollide(player, blocks, False):
+                    if characters.spritegrouplistcollide(player, blocks, False):
                         player.rect.x -= direction * player.speed
-                        moved = False
                 player.rect.x += direction * player.speed
                 moved = True
                 # Moving the player back if the collision occured
-                if spritegrouplistcollide(player, obstacles, False):
-                    test_rect = spritegrouplistcollide(player, blocks, False)
+                if characters.spritegrouplistcollide(player, obstacles, False):
+                    test_rect = characters.spritegrouplistcollide(player, blocks, False)
                     player.rect.x -= direction * player.speed
                     moved = False
                     # Aligning the player on the X axis so that he won't get stuck on crossings so often
@@ -178,11 +169,11 @@ class Game:
                 if pressed[key]:
                     if pygame.sprite.spritecollide(player, self.bombs, False):
                         player.rect.y += direction * player.speed
-                        if spritegrouplistcollide(player, blocks, False):
+                        if characters.spritegrouplistcollide(player, blocks, False):
                             player.rect.y -= direction * player.speed
                     player.rect.y += direction * player.speed
-                    if spritegrouplistcollide(player, obstacles, False):
-                        test_rect = spritegrouplistcollide(player, blocks, False)
+                    if characters.spritegrouplistcollide(player, obstacles, False):
+                        test_rect = characters.spritegrouplistcollide(player, blocks, False)
                         player.rect.y -= direction * player.speed
                         if len(test_rect) == 1 and player.rect.left % constants.SPRITE_SIZE != 0:
                             left_point  = (player.rect.left,  player.rect.center[1] + direction * constants.SPRITE_SIZE)
@@ -203,7 +194,12 @@ class Game:
             player.rect.y = player.get_tile_pos()[1] * constants.SPRITE_SIZE
 
     def update(self):
-        self.time -= 1
+        if self.time > 0:
+            self.time -= 1
+        else:
+            # TODO transform existing monsters into Pontans
+            pass
+        self.events = pygame.event.get()
         self.update_scoreboard()
         self.check_player_death()
         self.move_player()
@@ -246,18 +242,23 @@ class Game:
         self.activate_bonus(collected_bonus)
         killed_monsters = pygame.sprite.groupcollide(self.blasts, self.monsters, False, False, pygame.sprite.collide_rect_ratio(0.7))
         self.add_points(killed_monsters)
+        killed_monsters2 = self.get_killed_in_soft_blocks()
+        self.add_points(killed_monsters2)
         # TODO add invulnerability to bombs when having flame-proof or mystery bonus
         pygame.sprite.groupcollide(self.blasts, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
 
     def check_player_death(self):
         if self.player.sprite.dead == 1 and int(self.player.sprite.frame) == 7:
-            # Game Over, reseting the game
+            # Game Over, resetting the game
             if self.player.sprite.lives == -1:
                 self.player.sprite.lives = 2
                 self.player.sprite.max_bombs = 1
                 self.player.sprite.blast_range = 1
                 self.player.sprite.speed_bonus = False
                 self.player.sprite.detonator_bonus = False
+                self.player.sprite.wall_walker_bonus = False
+                self.player.sprite.bomb_walker_bonus = False
+                self.player.sprite.flame_proof_bonus = False
                 self.score = 0
                 self.initialize_level(1)
             # Restart the level with one life and bonuses other than bomb count, speed and blast range lost
@@ -265,7 +266,11 @@ class Game:
                 # Adding copy of player to GroupSingle - old one is removed
                 self.player.add(self.player_copy)
                 self.player.sprite.detonator_bonus = False
+                self.player.sprite.wall_walker_bonus = False
+                self.player.sprite.bomb_walker_bonus = False
+                self.player.sprite.flame_proof_bonus = False
                 self.score -= self.level_score
+                self.player.sprite.lives -= 1
                 self.initialize_level(self.level)
 
     def update_scoreboard(self):
@@ -317,25 +322,27 @@ class Game:
                     elif bonus.bonus_type == constants.Bonus.SPEEDUP:
                         self.player.sprite.speed_bonus = True
                     elif bonus.bonus_type == constants.Bonus.WALL_WALKER:
-                        pass
+                        self.player.sprite.wall_walker_bonus = True
                     elif bonus.bonus_type == constants.Bonus.DETONATOR:
                         self.player.sprite.detonator_bonus = True
                     elif bonus.bonus_type == constants.Bonus.BOMB_WALKER:
-                        pass
+                        self.player.sprite.bomb_walker_bonus = True
                     elif bonus.bonus_type == constants.Bonus.FLAME_PROOF:
-                        pass
+                        self.player.sprite.flame_proof_bonus = True
                     elif bonus.bonus_type == constants.Bonus.MYSTERY:
                         pass
+                        # TODO Mystery bonus, timer etc.
                     elif bonus.bonus_type == constants.Bonus.EXIT:
                         if len(self.monsters.sprites()) == 0:
                             self.level += 1
+                            self.player.sprite.lives += 1
                             self.initialize_level(self.level)
                     if bonus.bonus_type != constants.Bonus.EXIT:
                         bonus.kill()
 
     def detonate_remotely(self):
         if self.player.sprite.detonator_bonus:
-            for event in pygame.event.get(pygame.KEYDOWN):
+            for event in self.events:
                 if event.type == pygame.KEYDOWN:
                     if event.key in [pygame.K_LCTRL, pygame.K_RCTRL]:
                         if len(self.bombs.sprites()) > 0:
@@ -350,10 +357,18 @@ class Game:
                         self.level_score += monster.points
                         monster.kill()
 
+    def get_killed_in_soft_blocks(self):
+        killed_monsters = {}
+        collided = pygame.sprite.groupcollide(self.soft_blocks, self.monsters, False, False, pygame.sprite.collide_rect_ratio(0.7))
+        for block, monsters in collided.items():
+            if block.dead:
+                killed_monsters[block] = monsters
+        return killed_monsters
+
 
 def main():
     # initialization
-    tracemalloc.start(25)
+    # tracemalloc.start(25)
     pygame.init()
     screen = pygame.display.set_mode((constants.WINDOW_WIDTH, constants.WINDOW_HEIGHT))
     assets.Assets.load()
@@ -364,35 +379,35 @@ def main():
 
     # making necessary objects
     game = Game(screen)
-    game.initialize_level(3)
+    game.initialize_level(1)
 
     # main game loop
     while True:
         start_time = time.time()
 
         # enabling closing the window by system button
-        if pygame.QUIT in [event.type for event in pygame.event.get(pygame.QUIT)]:
+        if pygame.QUIT in [event.type for event in game.events]:
             break
 
         game.clear()
         game.update()
         game.draw()
-        pygame.event.pump()
         pygame.display.update()
         # wait for duration of tick minus time used to process code above
         pygame.time.wait(int(constants.TICK_TIME_MS - 1000 * (time.time() - start_time)))
 
-    # tracemalloc
-    snapshot = tracemalloc.take_snapshot()
-    top_stats = snapshot.statistics('traceback')
+    # MEMORY LEAKS CHECK:
+    # # tracemalloc
+    # snapshot = tracemalloc.take_snapshot()
+    # top_stats = snapshot.statistics('traceback')
+    #
+    # # pick the biggest memory block
+    # stat = top_stats[0]
+    # print("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
+    # for line in stat.traceback.format():
+    #     print(line)
 
-    # pick the biggest memory block
-    stat = top_stats[0]
-    print("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
-    for line in stat.traceback.format():
-        print(line)
-
-    # sweeping
+    # quitting
     pygame.display.quit()
     pygame.quit()
     sys.exit()
