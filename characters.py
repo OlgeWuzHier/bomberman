@@ -7,7 +7,7 @@ import assets
 
 
 def get_modified_position(coordinates, direction, delta):
-    """Returns modified coortinates by given direction and value"""
+    """Returns modified coordinates by given direction and value"""
     current_x, current_y = coordinates
     (new_x, new_y) = {
         0: lambda x, y: (x - delta, y),  # LEFT
@@ -26,7 +26,7 @@ def spritegrouplistcollide(sprite, grouplist, dokill):
             collision_list.append(item)
     return collision_list
 
-
+# Monster factory
 def get_monster_by_name(name, start_pos, player, bombs, soft_blocks, hard_blocks):
     monster = None
     if name == constants.Monster.BALLOM:
@@ -43,7 +43,8 @@ def get_monster_by_name(name, start_pos, player, bombs, soft_blocks, hard_blocks
         monster = Ovape(start_pos, bombs, hard_blocks)
     elif name == constants.Monster.TIGLON:
         monster = Tiglon(start_pos, player, bombs, soft_blocks, hard_blocks)
-    # elif name == constants.Monster.PONTAN:
+    elif name == constants.Monster.PONTAN:
+        monster = Pontan(start_pos, player, bombs, hard_blocks)
     if monster is None:
         raise ValueError
     return monster
@@ -157,7 +158,6 @@ class SoftBlock(Block):
         self.bonuses = bonuses
 
     def update(self):
-        # TODO: DELETE 2 LINES BELOW
         # if self.bonus_type != -1:
         #     self.image = assets.Assets.get_image_at(self.bonus_type, 7)
         if self.dead:
@@ -202,6 +202,7 @@ class Player(pygame.sprite.Sprite):
         self.wall_walker_bonus = False
         self.bomb_walker_bonus = False
         self.fire_proof_bonus = False
+        self.mystery_bonus = 0
         self.lives = 2
         self.dead = 0
 
@@ -318,7 +319,6 @@ class AdvancedEnemy(Enemy):
         self.dead = 0
         self.freeze = 0
         self.turn_ratio = 0
-        self.freeze = 0
         self.turn_time = 0
         self.obstacles = None
         self.chase_radius = 0
@@ -376,7 +376,6 @@ class SimpleEnemy(Enemy):
         self.dead = 0
         self.freeze = 0
         self.turn_ratio = 0
-        self.freeze = 0
         self.turn_time = 0
         self.obstacles = None
 
@@ -524,12 +523,22 @@ class Tiglon(AdvancedEnemy):
         self.random_turn_chance = 0.15
 
 
-class Pontan(Enemy):
+class Pontan(AdvancedEnemy):
     """The most difficult enemy in the game. Fast, passing through Soft Blocks and chasing.
 
     Pontan moves very quickly, passing through Soft Blocks and constantly pursuing the player.
     They're associated with the Invincibility Power-up and as such, will appear if said power up
     is blown up by a bomb, or the exit of a level with this power up present is bombed or if the
     timer reaches zero. They are able to chase the player from one side of the screen to the other."""
-    pass
+    def __init__(self, start_pos, player, bombs, hard_blocks):
+        super().__init__(start_pos, player)
+        self.speed = constants.BASE_SPEED * 2
+        self.turn_ratio = 0.6
+        self.turn_time = 0
+        self.movement_animation = constants.PONTAN_MOVEMENT_ANIMATION
+        self.death_animation = constants.PONTAN_DEATH_ANIMATION
+        self.points = 8000
+        self.obstacles = [bombs, hard_blocks]
+        self.chase_radius = 30 * constants.SPRITE_SIZE
+        self.random_turn_chance = 0.2
 

@@ -1,6 +1,5 @@
 import copy
 import os
-import random
 import sys
 
 import tracemalloc
@@ -130,16 +129,27 @@ class Game:
 
         moved = False
         pressed = pygame.key.get_pressed()
-        # TODO adjusting block group according to wall-walker bonus
-        blocks = [self.hard_blocks, self.soft_blocks]
-        obstacles = [self.hard_blocks, self.soft_blocks, self.bombs]
+        # Adjusting list of colliding objects according to bonuses
+        blocks = [self.hard_blocks]
+        if not player.wall_walker_bonus:
+            blocks.append(self.soft_blocks)
+
+        obstacles = [self.hard_blocks]
+        if not player.wall_walker_bonus:
+            obstacles.append(self.soft_blocks)
+        if not player.bomb_walker_bonus:
+            obstacles.append(self.bombs)
+
         # Loop on left and right arrows
         for key, direction in X_CHANGE.items():
             if pressed[key]:
-                if pygame.sprite.spritecollide(player, self.bombs, False):
-                    player.rect.x += direction * player.speed
-                    if characters.spritegrouplistcollide(player, blocks, False):
-                        player.rect.x -= direction * player.speed
+                if not player.bomb_walker_bonus:
+                    if pygame.sprite.spritecollide(player, self.bombs, False):
+                        player.rect.x += direction * player.speed
+                        if characters.spritegrouplistcollide(player, blocks, False):
+                            player.rect.x -= direction * player.speed
+                # if collision with bomb occured when not having bomb_walker_bonus player is moved
+                # kinda twice, but then he is moved back, because the collision was detected after all
                 player.rect.x += direction * player.speed
                 moved = True
                 # Moving the player back if the collision occured
@@ -156,7 +166,6 @@ class Game:
                         collision_bottom = test_rect[0].rect.collidepoint(bottom_point)
                         # If the collision was only on one of the points - the player is aligned
                         if collision_top and not collision_bottom:
-                            # TODO: better alignment
                             player.rect.y += player.speed
                             moved = True
                         elif not collision_top and collision_bottom:
@@ -167,10 +176,11 @@ class Game:
         if not moved:
             for key, direction in Y_CHANGE.items():
                 if pressed[key]:
-                    if pygame.sprite.spritecollide(player, self.bombs, False):
-                        player.rect.y += direction * player.speed
-                        if characters.spritegrouplistcollide(player, blocks, False):
-                            player.rect.y -= direction * player.speed
+                    if not player.bomb_walker_bonus:
+                        if pygame.sprite.spritecollide(player, self.bombs, False):
+                            player.rect.y += direction * player.speed
+                            if characters.spritegrouplistcollide(player, blocks, False):
+                                player.rect.y -= direction * player.speed
                     player.rect.y += direction * player.speed
                     if characters.spritegrouplistcollide(player, obstacles, False):
                         test_rect = characters.spritegrouplistcollide(player, blocks, False)
@@ -197,7 +207,7 @@ class Game:
         if self.time > 0:
             self.time -= 1
         else:
-            # TODO transform existing monsters into Pontans
+            # TODO transform existing monsters into Pontans, spawn 10 Pontans
             pass
         self.events = pygame.event.get()
         self.update_scoreboard()
@@ -227,25 +237,30 @@ class Game:
         pressed = pygame.key.get_pressed()
         if pressed[pygame.K_SPACE]:
             if player.max_bombs > len(self.bombs.sprites()):
-                # Avoiding placing multiple bombs in one place
-                if not pygame.sprite.spritecollide(player, self.bombs, False, pygame.sprite.collide_rect_ratio(0.8)):
-                    self.bombs.add(characters.Bomb(player.get_tile_pos(),
-                                                   player.blast_range,
-                                                   self.blasts,
-                                                   self.hard_blocks,
-                                                   self.soft_blocks,
-                                                   remote=player.detonator_bonus))
+                # Avoiding placing multiple bombs in one place or on softblocks (wall-walker)
+                if not pygame.sprite.spritecollide(player, self.soft_blocks, False, pygame.sprite.collide_rect_ratio(0.8)):
+                    if not pygame.sprite.spritecollide(player, self.bombs, False, pygame.sprite.collide_rect_ratio(0.8)):
+                        self.bombs.add(characters.Bomb(player.get_tile_pos(),
+                                                       player.blast_range,
+                                                       self.blasts,
+                                                       self.hard_blocks,
+                                                       self.soft_blocks,
+                                                       remote=player.detonator_bonus))
 
     def check_collisions(self):
-        pygame.sprite.groupcollide(self.monsters, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
         collected_bonus = pygame.sprite.groupcollide(self.player, self.bonuses, False, False, pygame.sprite.collide_rect_ratio(0.7))
         self.activate_bonus(collected_bonus)
+        if not self.player.sprite.mystery_bonus:
+            pygame.sprite.groupcollide(self.monsters, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
         killed_monsters = pygame.sprite.groupcollide(self.blasts, self.monsters, False, False, pygame.sprite.collide_rect_ratio(0.7))
         self.add_points(killed_monsters)
         killed_monsters2 = self.get_killed_in_soft_blocks()
         self.add_points(killed_monsters2)
-        # TODO add invulnerability to bombs when having flame-proof or mystery bonus
-        pygame.sprite.groupcollide(self.blasts, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
+        if not self.player.sprite.fire_proof_bonus and not self.player.sprite.mystery_bonus:
+            pygame.sprite.groupcollide(self.blasts, self.player, False, True, pygame.sprite.collide_rect_ratio(0.7))
+            for soft_block in self.soft_blocks.sprites():
+                if soft_block.dead:
+                    pygame.sprite.spritecollide(soft_block, self.player, True, pygame.sprite.collide_rect_ratio(0.7))
 
     def check_player_death(self):
         if self.player.sprite.dead == 1 and int(self.player.sprite.frame) == 7:
@@ -260,7 +275,8 @@ class Game:
                 self.player.sprite.bomb_walker_bonus = False
                 self.player.sprite.flame_proof_bonus = False
                 self.score = 0
-                self.initialize_level(1)
+                self.level = 1
+                self.initialize_level(self.level)
             # Restart the level with one life and bonuses other than bomb count, speed and blast range lost
             else:
                 # Adding copy of player to GroupSingle - old one is removed
@@ -290,11 +306,11 @@ class Game:
 
             text_shadow = font.render(string, True, constants.BLACK_COLOR, constants.BACKGROUND_COLOR)
             text_shadow.set_colorkey(constants.BACKGROUND_COLOR)
-
             text_shadow_rect = text_shadow.get_rect()
 
             text_rect.top = constants.SPRITE_SIZE
             text_shadow_rect.top = constants.SPRITE_SIZE
+
             if position == 0:
                 text_rect.x = constants.SPRITE_SIZE // 2
                 text_shadow_rect.x = constants.SPRITE_SIZE // 2
@@ -374,7 +390,7 @@ def main():
     assets.Assets.load()
     pygame.display.set_caption("Bomberman")  # set the window title
     pygame.display.set_icon(assets.Assets.get_image_at(0, 3)) # set the window icon
-    # pygame.mouse.set_visible(False)  # hide the mouse
+    pygame.mouse.set_visible(False)  # hide the mouse
     os.environ['SDL_VIDEO_CENTERED'] = '1'  # center the window
 
     # making necessary objects

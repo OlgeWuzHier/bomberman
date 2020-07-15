@@ -67,7 +67,10 @@ TIGLON_MOVEMENT_ANIMATION = [
 TIGLON_DEATH_ANIMATION = [(7, 8), (8, 8), (9, 8), (10, 8), (11, 8)]
 
 # Pontan is a spinning coin, so it has only one animation of movement
-PONTAN_MOVEMENT_ANIMATION = [(0, 15), (1, 15), (2, 15), (3, 15)]
+PONTAN_MOVEMENT_ANIMATION = [
+    [(0, 15), (1, 15), (2, 15), (3, 15)],
+    [(0, 15), (1, 15), (2, 15), (3, 15)],
+]
 PONTAN_DEATH_ANIMATION = [(7, 8), (8, 8), (9, 8), (10, 8), (11, 8)]
 
 # Bomberman movement - left, down, right, up
@@ -104,7 +107,7 @@ class Bonus(enum.IntEnum):
     FIRE_RANGE = 1  # 5 at max
     SPEEDUP = 2  # Bomberman's speed is doubled
     WALL_WALKER = 3  # Walk through Soft Blocks, lost after death
-    DETONATOR = 4  # Space to set the bomb(s), Enter to detonate it(/them), lost after death
+    DETONATOR = 4  # Space to set the bomb(s), Ctrl to detonate it(/them), lost after death
     BOMB_WALKER = 5  # Walk through your bombs, lost after death
     FLAME_PROOF = 6  # Immune to your own bombs, lasts forever, lost after death
     MYSTERY = 7  # Invisible for bombs and enemies, lasts 35 seconds
@@ -122,7 +125,7 @@ class Monster(enum.IntEnum):
     PONTAN = 7
 
 
-# Ballons, Onils, Dahls, Minvos, Doria, Ovapes, Tiglons, Pontans, Bonus_number
+# Ballons, Onils, Dahls, Minvos, Dorias, Ovapes, Tiglons, Pontans, Bonus_number
 LEVEL_CONTENT_LIST = [
     ([6, 0, 0, 0, 0, 0, 0, 0], 1),  # 1
     ([3, 3, 0, 0, 0, 0, 0, 0], 0),  # 2
@@ -170,14 +173,14 @@ LEVEL_CONTENT_LIST = [
     ([0, 0, 2, 1, 1, 3, 3, 0], 4),  # 37
     ([0, 0, 2, 2, 0, 3, 3, 0], 3),  # 38
     ([0, 0, 1, 1, 2, 2, 4, 0], 5),  # 39
-
     ([0, 0, 1, 2, 0, 3, 4, 0], 7),  # 40
+
     ([0, 0, 1, 1, 1, 3, 4, 0], 4),  # 41
     ([0, 0, 0, 1, 1, 3, 5, 0], 3),  # 42
     ([0, 0, 0, 1, 1, 2, 6, 0], 5),  # 43
     ([0, 0, 0, 1, 1, 2, 6, 0], 4),  # 44
-
     ([0, 0, 0, 0, 2, 2, 6, 0], 7),  # 45
+
     ([0, 0, 0, 0, 2, 2, 6, 0], 3),  # 46
     ([0, 0, 0, 0, 2, 2, 6, 0], 5),  # 47
     ([0, 0, 0, 0, 1, 2, 6, 1], 4),  # 48
